@@ -4,22 +4,6 @@
 #include "memchunkhax.h"
 #include "firmlaunchax.h"
 
-static int load_file(char *dest, short unsigned int *path, uint32_t offset, uint32_t size)
-{
-    uint32_t file_handle[8] = {0};
-    uint32_t bytes_read;
-
-    int result = app->fopen(&file_handle, path, 1);
-    if (result != 0) {
-        return result;
-    }
-    file_handle[1] = offset;
-
-    app->fread(&file_handle, &bytes_read, dest, size);
-
-    return 0;
-}
-
 static void arm11_kernel_code()
 {
     __asm__ volatile ("clrex");
@@ -33,17 +17,34 @@ static void arm11_kernel_code()
 
 void __attribute__((noreturn, section(".text.start"), used)) _start()
 {
+    uint32_t file_handle[8] = {0};
+    void *fws;
+    uint32_t n;
+
 #ifdef ENTRY_SPIDER
     // Some offsets that differ per entry
     spider_set_app_offsets();
 #endif
 
-    // Some offsets differ per firmware
-    set_firmware_offsets();
+    app->fopen(&file_handle, APP_LAUNCHER_PATH, 1);
 
-    // Load the payload to memory
-    load_file((char *)(0x14000000 + APP_CFW_OFFSET), APP_LAUNCHER_PATH,
-              0x12000, PAYLOAD_TABLE_SIZE + PAYLOAD_ARM9_SIZE);
+    if (*(uint32_t *)0x1FF80030 < 6) {
+        file_handle[1] = 27136;
+        n = FW_CTR_SIZE;
+    } else {
+        file_handle[1] = 27648;
+        n = FW_KTR_SIZE;
+    }
+
+    fws = __builtin_alloca(n);
+    app->fread(&file_handle, &n, fws, n);
+
+    // Some offsets differ per firmware
+    set_firmware_offsets(fws, n);
+
+    file_handle[1] = 0x12000;
+    app->fread(&file_handle, &n, (void *)(0x14000000 + APP_CFW_OFFSET),
+               PAYLOAD_TABLE_SIZE + PAYLOAD_ARM9_SIZE);
 
     // Now, we gain arm11 kernel mode
     memchunk_arm11hax(arm11_kernel_code);

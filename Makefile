@@ -25,6 +25,9 @@ get_objects = $(patsubst $(dir_source)/%.s, $(dir_build)/%.o, \
 
 objects := $(addprefix $(dir_build)/,appcompat.o firmcompat.o firmlaunchax.o memchunkhax.o start.o)
 
+objects_fw_ctr := $(dir_build)/firmcompat/ctr.o
+objects_fw_ktr := $(dir_build)/firmcompat/ktr.o
+
 objects_payload_table := $(dir_build)/payload/jump_table.o
 objects_payload_arm9 := $(call get_objects, \
 				   $(call rwildcard, $(dir_source)/payload/arm9, *.s *.c))
@@ -33,6 +36,8 @@ versions := mset_4x mset_4x_dg mset_4x_ndg mset_6x
 
 rops := $(foreach ver, $(versions), $(dir_build)/$(ver)/rop.dat)
 
+FW_CTR := $(dir_build)/firmcompat/ctr.bin
+FW_KTR := $(dir_build)/firmcompat/ktr.bin
 PAYLOAD_TABLE := $(dir_build)/payload/jump_table.bin
 
 .SECONDARY:
@@ -54,14 +59,16 @@ clean:
 	rm -rf $(dir_out)/$(name) $(dir_build)
 
 # Throw everything together
-$(dir_out)/$(name): $(rops) $(dir_build)/mset/main.bin $(dir_build)/spider/main.bin
+$(dir_out)/$(name): $(rops) $(dir_build)/mset/main.bin $(dir_build)/spider/main.bin $(FW_CTR) $(FW_KTR)
 	touch $@
 	dd if=$(dir_build)/spider/main.bin of=$@ bs=512 seek=0
 	dd if=$(dir_build)/mset_4x/rop.dat of=$@ bs=512 seek=32
 	dd if=$(dir_build)/mset_4x_dg/rop.dat of=$@ bs=512 seek=34
 	dd if=$(dir_build)/mset_4x_ndg/rop.dat of=$@ bs=512 seek=36
 	dd if=$(dir_build)/mset_6x/rop.dat of=$@ bs=512 seek=40
-	dd if=$(dir_build)/mset/main.bin of=$@ bs=512 seek=64
+	dd if=$(dir_build)/mset/main.bin of=$@ bs=512 seek=51
+	dd if=$(FW_CTR) of=$@ bs=512 seek=53
+	dd if=$(FW_KTR) of=$@ bs=512 seek=54
 	dd if=$(PAYLOAD_TABLE) of=$@ bs=512 seek=144
 	cat $(PAYLOAD_PRIMARY) >> $@
 
@@ -78,6 +85,13 @@ $(dir_build)/mset_%/rop.elf: rop_param = MSET_$(shell echo $* | tr a-z A-Z)
 $(dir_build)/mset_%/rop.elf: LoadCodeMset.S
 	@mkdir -p "$(@D)"
 	$(COMPILE.c) -D$(rop_param) -DARM_CODE_OFFSET=0x8000 $< -o $@
+
+# firmcompat
+$(dir_build)/firmcompat/ctr.elf: $(objects_fw_ctr)
+	$(LINK.o) $(OUTPUT_OPTION) $^
+
+$(dir_build)/firmcompat/ktr.elf: $(objects_fw_ktr)
+	$(LINK.o) $(OUTPUT_OPTION) $^
 
 # jump_table payload
 $(dir_build)/payload/jump_table.elf: $(objects_payload_table)
@@ -119,10 +133,14 @@ $(dir_build)/payload/%.o: $(dir_source)/payload/%.s
 	@mkdir -p "$(@D)"
 	$(COMPILE.s) $(OUTPUT_OPTION) $<
 
-.SECONDEXPANSION:
-$(dir_build)/%.o: $(dir_source)/$$(notdir $$*).c $(PAYLOAD_TABLE) $$(PAYLOAD_PRIMARY)
+$(dir_build)/firmcompat/%.o: $(dir_source)/firmcompat/%.c
 	@mkdir -p "$(@D)"
-	$(COMPILE.c) -flto $(OUTPUT_OPTION) -DPAYLOAD_TABLE_SIZE=$(call getSize,$(PAYLOAD_TABLE)) -DPAYLOAD_ARM9_SIZE=$(call getSize,$(PAYLOAD_PRIMARY)) $<
+	$(COMPILE.c) -flto $(OUTPUT_OPTION) $<
+
+.SECONDEXPANSION:
+$(dir_build)/%.o: $(dir_source)/$$(notdir $$*).c $(FW_CTR) $(FW_KTR) $(PAYLOAD_TABLE) $$(PAYLOAD_PRIMARY)
+	@mkdir -p "$(@D)"
+	$(COMPILE.c) -flto $(OUTPUT_OPTION) -DFW_CTR_SIZE=$(call getSize,$(FW_CTR)) -DFW_KTR_SIZE=$(call getSize,$(FW_KTR)) -DPAYLOAD_TABLE_SIZE=$(call getSize,$(PAYLOAD_TABLE)) -DPAYLOAD_ARM9_SIZE=$(call getSize,$(PAYLOAD_PRIMARY)) $<
 
 .SECONDEXPANSION:
 $(dir_build)/%.o: $(dir_source)/$$(notdir $$*).s

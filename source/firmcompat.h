@@ -1,6 +1,7 @@
 #ifndef firmcompat_h
 #define firmcompat_h
 
+#include <stddef.h>
 #include <stdint.h>
 #include "appcompat.h"
 
@@ -19,6 +20,6 @@ struct firmware_offsets {
 
 extern const struct firmware_offsets *fw;
 
-int set_firmware_offsets();
+int set_firmware_offsets(const struct firmware_offsets *p, size_t n);
 
 #endif
