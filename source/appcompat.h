@@ -6,8 +6,6 @@
 
 struct app_offsets
 {
-    uint32_t spec;
-
     int (*GSPGPU_FlushDataCache)(void *address, uint32_t length);
     void (*nn__gxlow__CTR__CmdReqQueueTx__TryEnqueue)(void *arg1, void *arg2);
     int (*fopen)(uint32_t (*handle)[], short unsigned int *path, int flags);
@@ -17,7 +15,9 @@ struct app_offsets
 };
 
 extern const struct app_offsets *app;
-int set_app_offsets();
+#ifdef ENTRY_SPIDER
+int spider_set_app_offsets();
+#endif
 
 #if defined(ENTRY_MSET)
     // The usable area for this app

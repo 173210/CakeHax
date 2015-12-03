@@ -23,7 +23,7 @@ LDFLAGS := -nostartfiles -flto -fwhole-program
 get_objects = $(patsubst $(dir_source)/%.s, $(dir_build)/%.o, \
 			  $(patsubst $(dir_source)/%.c, $(dir_build)/%.o, $1))
 
-objects := $(call get_objects, $(wildcard $(dir_source)/*.s $(dir_source)/*.c))
+objects := $(addprefix $(dir_build)/,appcompat.o firmcompat.o firmlaunchax.o memchunkhax.o start.o)
 
 objects_payload_table := $(dir_build)/payload/jump_table.o
 objects_payload_arm9 := $(call get_objects, \
@@ -52,7 +52,6 @@ bigpayload: $(dir_out)/$(name)
 .PHONY: clean
 clean:
 	rm -rf $(dir_out)/$(name) $(dir_build)
-	@$(MAKE) -C $(dir_rop3ds) clean
 
 # Throw everything together
 $(dir_out)/$(name): $(rops) $(dir_build)/mset/main.bin $(dir_build)/spider/main.bin
@@ -66,17 +65,21 @@ $(dir_out)/$(name): $(rops) $(dir_build)/mset/main.bin $(dir_build)/spider/main.
 	dd if=$(PAYLOAD_TABLE) of=$@ bs=512 seek=144
 	cat $(PAYLOAD_PRIMARY) >> $@
 
-# MSET ROPs
-$(dir_build)/mset_%/rop.dat: rop_param = MSET_$(shell echo $* | tr a-z A-Z)
-$(dir_build)/mset_%/rop.dat:
-	@make -C rop3ds LoadCodeMset.dat ASFLAGS="-D$(rop_param) -DARM_CODE_OFFSET=0x8000"
-	@mkdir -p "$(@D)"
-	@mv rop3ds/LoadCodeMset.dat $@
 
 # Create bin from elf
 $(dir_build)/%.bin: $(dir_build)/%.elf
 	$(OC) -S -O binary $< $@
 
+$(dir_build)/%.dat: $(dir_build)/%.elf
+	$(OC) -S -O binary $< $@
+
+# MSET ROPs
+$(dir_build)/mset_%/rop.elf: rop_param = MSET_$(shell echo $* | tr a-z A-Z)
+$(dir_build)/mset_%/rop.elf: LoadCodeMset.S
+	@mkdir -p "$(@D)"
+	$(COMPILE.c) -D$(rop_param) -DARM_CODE_OFFSET=0x8000 $< -o $@
+
+# jump_table payload
 $(dir_build)/payload/jump_table.elf: $(objects_payload_table)
 	$(LINK.o) $(OUTPUT_OPTION) $^
 
@@ -91,7 +94,7 @@ $(dir_build)/payload/arm9/main.elf: $(objects_payload_arm9)
 $(dir_build)/%/main.elf: ASFLAGS := $(ARM11FLAGS) $(ASFLAGS)
 
 $(dir_build)/mset/main.elf: CFLAGS := -DENTRY_MSET $(ARM11FLAGS) $(CFLAGS)
-$(dir_build)/mset/main.elf: $(patsubst $(dir_build)/%, $(dir_build)/mset/%, $(objects))
+$(dir_build)/mset/main.elf: $(patsubst $(dir_build)/%, $(dir_build)/mset/%, $(objects)) $(dir_build)/mset/mset.o
 	$(LINK.o) -T linker_mset.ld $(OUTPUT_OPTION) $^
 
 $(dir_build)/spider/main.elf: CFLAGS := -DENTRY_SPIDER $(ARM11FLAGS) $(CFLAGS)

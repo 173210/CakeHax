@@ -2,6 +2,7 @@ ENTRY(_start)
 SECTIONS
 {
     . = 0x00240000;
+    .text.mset : { *(.text.mset) }
     .text.start : { *(.text.start) }
     .text : { *(.text) }
     .rodata : { *(.rodata) }

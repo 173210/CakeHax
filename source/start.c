@@ -33,8 +33,10 @@ static void arm11_kernel_code()
 
 void __attribute__((noreturn, section(".text.start"), used)) _start()
 {
+#ifdef ENTRY_SPIDER
     // Some offsets that differ per entry
-    set_app_offsets();
+    spider_set_app_offsets();
+#endif
 
     // Some offsets differ per firmware
     set_firmware_offsets();
