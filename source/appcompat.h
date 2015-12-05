@@ -2,41 +2,23 @@
 #define appcompat_h
 
 #include <stdint.h>
-#include "launcher_path.h"
+#include <wchar.h>
 
 struct app_offsets
 {
     int (*GSPGPU_FlushDataCache)(void *address, uint32_t length);
     void (*nn__gxlow__CTR__CmdReqQueueTx__TryEnqueue)(void *arg1, void *arg2);
-    int (*fopen)(uint32_t (*handle)[], short unsigned int *path, int flags);
+    int (*fopen)(uint32_t (*handle)[], const wchar_t *path, int flags);
     int (*fread)(uint32_t (*handle)[], uint32_t *read, void *buffer, uint32_t size);
 
     uint32_t gpuHandle;
 };
 
-extern const struct app_offsets *app;
-#ifdef ENTRY_SPIDER
-int spider_set_app_offsets();
-#endif
+struct spider {
+    uint32_t spec;
+    struct app_offsets offsets;
+};
 
-#if defined(ENTRY_MSET)
-    // The usable area for this app
-    #define APP_FCRAM_ADDR 0x14000000
-
-    #define APP_CFW_OFFSET 0x400000
-    #define APP_LAUNCHER_PATH (L"YS:/" LAUNCHER_PATH)
-
-#elif defined(ENTRY_SPIDER)
-    // The usable area for this app
-    #define APP_FCRAM_ADDR 0x18400000
-
-    #define APP_CFW_OFFSET 0x4410000
-    #define APP_LAUNCHER_PATH (L"dmc:/" LAUNCHER_PATH)
-#endif
-
-// Locations in fcram
-#define APP_CHECK_MEM (APP_FCRAM_ADDR + 0x1000)
-#define APP_ARM11_BUFFER (APP_FCRAM_ADDR + 0x2000)
-#define APP_MEM_HAX_MEM (APP_FCRAM_ADDR + 0x50000)
+extern const struct spider spiders[];
 
 #endif

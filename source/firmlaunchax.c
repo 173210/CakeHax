@@ -33,7 +33,7 @@ static void *memcpy32(void *dst, const void *src, size_t n)
     return dst;
 }
 
-static void setup_gpu()
+static void setup_gpu(const struct firmware_offsets *fw)
 {
     volatile uint32_t *top_left1 = (volatile uint32_t *)(fw->regs + 0x468);
     volatile uint32_t *top_left2 = (volatile uint32_t *)(fw->regs + 0x46C);
@@ -60,46 +60,46 @@ static void setup_gpu()
     }
 }
 
-void firmlaunch_arm9hax()
+void firmlaunch_arm9hax(const struct arm9hax_ctx *ctx)
 {
     uintptr_t p, payload;
 
-    payload = fw->fcram_address + APP_CFW_OFFSET;
+    payload = ctx->fw->fcram_address + ctx->payload_offset;
     // Copy arm9 code
     uint32_t code_offset = 0x3F00000;
-    memcpy32((void *)(fw->fcram_address + code_offset),
+    memcpy32((void *)(ctx->fw->fcram_address + code_offset),
              (void *)(payload + PAYLOAD_TABLE_SIZE),
              PAYLOAD_ARM9_SIZE);
 
     // Prepare framebuffer info for arm9
-    setup_gpu();
+    setup_gpu(ctx->fw);
 
     // Copy the jump table
-    memcpy32((void *)fw->jump_table_address, (void *)payload, PAYLOAD_TABLE_SIZE);
+    memcpy32((void *)ctx->fw->jump_table_address, (void *)payload, PAYLOAD_TABLE_SIZE);
 
     // Write firmware-specific offsets to the jump table
-    *(uint32_t *)(fw->jump_table_address + PAYLOAD_TABLE_SIZE) = fw->func_patch_return;
-    *(uint32_t *)(fw->jump_table_address + PAYLOAD_TABLE_SIZE + 4) = fw->regs;
+    *(uint32_t *)(ctx->fw->jump_table_address + PAYLOAD_TABLE_SIZE) = ctx->fw->func_patch_return;
+    *(uint32_t *)(ctx->fw->jump_table_address + PAYLOAD_TABLE_SIZE + 4) = ctx->fw->regs;
 
     // Patch arm11 functions
-    *(uint32_t *)fw->func_patch_address = 0xE51FF004;
-    *(uint32_t *)(fw->func_patch_address + 4) = 0xFFFF0C80;
-    *(uint32_t *)fw->reboot_patch_address = 0xE51FF004;
-    *(uint32_t *)(fw->reboot_patch_address + 4) = 0x1FFF4C80+4;
+    *(uint32_t *)ctx->fw->func_patch_address = 0xE51FF004;
+    *(uint32_t *)(ctx->fw->func_patch_address + 4) = 0xFFFF0C80;
+    *(uint32_t *)ctx->fw->reboot_patch_address = 0xE51FF004;
+    *(uint32_t *)(ctx->fw->reboot_patch_address + 4) = 0x1FFF4C80+4;
 
-    for (p = fw->jump_table_address;
-         p < fw->jump_table_address + PAYLOAD_TABLE_SIZE;
+    for (p = ctx->fw->jump_table_address;
+         p < ctx->fw->jump_table_address + PAYLOAD_TABLE_SIZE;
          p += 32)
     {
         clean(p);
     }
 
-    clean(fw->func_patch_address);
-    clean(fw->reboot_patch_address);
+    clean(ctx->fw->func_patch_address);
+    clean(ctx->fw->reboot_patch_address);
     dsb();
 
     // Trigger reboot
-    ((void (*)())fw->reboot_func_address)(0, 0, 2, 0);
+    ((void (*)())ctx->fw->reboot_func_address)(0, 0, 2, 0);
 
     while (1) {};
 }

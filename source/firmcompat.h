@@ -18,8 +18,7 @@ struct firmware_offsets {
     uint32_t regs;
 };
 
-extern const struct firmware_offsets *fw;
-
-int set_firmware_offsets(const struct firmware_offsets *p, size_t n);
+const struct firmware_offsets *get_firmware_offsets(
+    const struct firmware_offsets *p, size_t n);
 
 #endif

@@ -1,13 +1,10 @@
 ENTRY(_start)
 SECTIONS
 {
-    . = 0x00240000;
+    .text.spider : { *(.text.spider) }
+    .rodata.spider : { *(.rodata.spider) }
     .text.mset : { *(.text.mset) }
     .text.start : { *(.text.start) }
     .text : { *(.text) }
     .rodata : { *(.rodata) }
-    .data : { *(.data) }
-
-    . = 0x14020000;
-    .bss : { *(.bss) }
 }

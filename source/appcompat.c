@@ -1,15 +1,7 @@
 #include <stdint.h>
 #include "appcompat.h"
 
-const struct app_offsets *app;
-
-#ifdef ENTRY_SPIDER
-struct spider {
-    uint32_t spec;
-    struct app_offsets offsets;
-};
-
-static const struct spider spiders[] = {
+__attribute__((section(".rodata.spider"))) const struct spider spiders[] = {
     {
         // 4.x
         .spec = 0xEB0676B5,
@@ -155,18 +147,3 @@ static const struct spider spiders[] = {
         }
     }
 };
-
-int spider_set_app_offsets()
-{
-    const struct spider *cur, *btm;
-
-    cur = spiders;
-    for (btm = cur + sizeof(spiders) / sizeof(struct app_offsets); cur != btm; cur++)
-        if (cur->spec == *(uint32_t *)0x0010000C) {
-            app = &cur->offsets;
-            return 0;
-        }
-
-    return 1;
-}
-#endif
